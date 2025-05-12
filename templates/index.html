@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Knowledge Representation Graph</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    .node circle {
+      fill: #69b3a2;
+      stroke: #333;
+      stroke-width: 1.5px;
+    }
+    .link {
+      stroke: #999;
+      stroke-opacity: 0.6;
+    }
+    .label {
+      font-size: 12px;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <h1>Knowledge Representation Graph</h1>
+  <form id="graphForm">
+    <textarea name="text" placeholder="Enter content here..." rows="4" cols="60"></textarea><br>
+    <!-- OR Upload PDF: <input type="file" name="pdf"><br> -->
+    <!-- OR Enter URL: <input type="text" name="url" placeholder="https://..."><br> -->
+    <button type="submit">Generate Graph</button>
+  </form>
+  <svg width="900" height="600"></svg>
+
+  <script>
+    document.getElementById('graphForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+
+      fetch('/generate', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => drawGraph(data));
+    });
+
+    function drawGraph(triples) {
+      const nodes = {}, links = [];
+
+      triples.forEach(triple => {
+        nodes[triple.source] = { id: triple.source };
+        nodes[triple.target] = { id: triple.target };
+        links.push({ source: triple.source, target: triple.target, label: triple.relation });
+      });
+
+      const svg = d3.select('svg');
+      svg.selectAll('*').remove();
+
+      const width = +svg.attr('width');
+      const height = +svg.attr('height');
+
+      const simulation = d3.forceSimulation(Object.values(nodes))
+        .force('link', d3.forceLink(links).id(d => d.id).distance(150))
+        .force('charge', d3.forceManyBody().strength(-400))
+        .force('center', d3.forceCenter(width / 2, height / 2));
+
+      const link = svg.append('g')
+        .attr('class', 'links')
+        .selectAll('line')
+        .data(links)
+        .enter().append('line')
+        .attr('class', 'link');
+
+      const node = svg.append('g')
+        .attr('class', 'nodes')
+        .selectAll('g')
+        .data(Object.values(nodes))
+        .enter().append('g');
+
+      node.append('circle')
+        .attr('r', 15);
+
+      node.append('text')
+        .attr('class', 'label')
+        .attr('x', 20)
+        .attr('y', 5)
+        .text(d => d.id);
+
+      const linkText = svg.append('g')
+        .selectAll('text')
+        .data(links)
+        .enter().append('text')
+        .attr('class', 'label')
+        .text(d => d.label);
+
+      simulation.on('tick', () => {
+        link
+          .attr('x1', d => d.source.x)
+          .attr('y1', d => d.source.y)
+          .attr('x2', d => d.target.x)
+          .attr('y2', d => d.target.y);
+
+        node
+          .attr('transform', d => `translate(${d.x},${d.y})`);
+
+        linkText
+          .attr('x', d => (d.source.x + d.target.x) / 2)
+          .attr('y', d => (d.source.y + d.target.y) / 2);
+      });
+    }
+  </script>
+</body>
+</html>
